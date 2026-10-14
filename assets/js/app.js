@@ -304,6 +304,15 @@
     const specialty = $('specialty-filter');
     if (!host) return;
 
+    // Keep the filter in sync with data.js so newly added specialties, such
+    // as Periodontics, are available without editing doctors.html as well.
+    const specialties = [...new Set(data.doctors.map(d => d.specialty).filter(Boolean))].sort();
+    specialties.forEach(value => {
+      if (![...specialty.options].some(option => option.value === value)) {
+        specialty.add(new Option(value, value));
+      }
+    });
+
     const render = () => {
       const query = search.value.toLowerCase();
       const list = data.doctors.filter(d =>

@@ -6,7 +6,12 @@ window.EVERWELL_DATA = {
     {id:"dr-olivia",name:"Dr. Olivia Chen",initials:"OC",specialty:"Orthodontics",credentials:"DDS, MS",clinic:"Northside",experience:"9 years",days:"Tue, Wed, Fri",hours:"8:30 AM – 3:30 PM",image:"https://images.unsplash.com/photo-1594824476967-48c8b964273f?auto=format&fit=crop&w=800&q=85",bio:"Focuses on personalized alignment plans for teens and adults.",availability:"Next opening tomorrow"},
     {id:"dr-noah",name:"Dr. Noah Williams",initials:"NW",specialty:"Endodontics",credentials:"DMD",clinic:"Downtown",experience:"14 years",days:"Mon, Wed, Thu",hours:"9:00 AM – 3:00 PM",image:"https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&w=800&q=85",bio:"Provides careful, patient-centered treatment for tooth pain and root canal needs.",availability:"Available Thursday"},
     {id:"dr-sophia",name:"Dr. Sophia Martinez",initials:"SM",specialty:"Pediatric Dentistry",credentials:"DDS, Board Certified",clinic:"Northside",experience:"8 years",days:"Mon – Fri",hours:"8:00 AM – 2:00 PM",image:"https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=800&q=85",bio:"Makes visits welcoming for children and supports parents with practical advice.",availability:"Available today"},
-    {id:"dr-ethan",name:"Dr. Ethan Brooks",initials:"EB",specialty:"General Dentistry",credentials:"DDS",clinic:"Northside",experience:"7 years",days:"Tue – Sat",hours:"10:00 AM – 6:00 PM",image:"https://images.unsplash.com/photo-1607990281513-2c110a25bd8c?auto=format&fit=crop&w=800&q=85",bio:"Enjoys helping patients build simple, sustainable habits for lifelong oral health.",availability:"Next opening Friday"}
+    {id:"dr-ethan",name:"Dr. Ethan Brooks",initials:"EB",specialty:"General Dentistry",credentials:"DDS",clinic:"Northside",experience:"7 years",days:"Tue – Sat",hours:"10:00 AM – 6:00 PM",image:"https://images.unsplash.com/photo-1607990281513-2c110a25bd8c?auto=format&fit=crop&w=800&q=85",bio:"Enjoys helping patients build simple, sustainable habits for lifelong oral health.",availability:"Next opening Friday"},
+    {
+      id:"dr-bilal",name:"Dr. M Bilal Zafar",initials:"AP",specialty:"Periodontics",credentials:"DMD, Board Certified",clinic:"Downtown",experience:"11 years",days:"Mon, Wed, Fri",hours:"9:00 AM – 4:00 PM",image:"https://drupak.com/sites/default/files/2026-07/Ellipse%2019.png?alternateWidths=/sites/default/files/styles/canvas_parametrized_width--%7Bwidth%7D/public/2026-07/Ellipse%252019.png.webp%3Fitok%3DZHNqQLCS",bio:"Specializes in gum health and dental implant procedures with a gentle touch.",availability:"Next opening Monday"
+    }
+
+    
   ],
   services: [
     {icon:"✧",name:"General Dentistry",description:"Routine exams, professional cleanings, digital X-rays, and preventive care plans.",duration:"30–60 min",from:"$95"},
@@ -14,7 +19,11 @@ window.EVERWELL_DATA = {
     {icon:"⌁",name:"Restorative Dentistry",description:"Tooth-colored fillings, crowns, bridges, and options to restore comfort and function.",duration:"45–90 min",from:"$180"},
     {icon:"♡",name:"Family Dentistry",description:"Friendly oral health care for children, teens, adults, and older family members.",duration:"30–60 min",from:"$85"},
     {icon:"⌘",name:"Orthodontics",description:"Consultations and treatment planning for braces and clear aligner options.",duration:"30–45 min",from:"$120"},
-    {icon:"✦",name:"Emergency Visits",description:"Prompt assessment for tooth pain, swelling, broken teeth, or urgent concerns.",duration:"30–60 min",from:"$125"}
+    {icon:"✦",name:"Emergency Visits",description:"Prompt assessment for tooth pain, swelling, broken teeth, or urgent concerns.",duration:"30–60 min",from:"$125"},
+    {
+      icon:"✪",name:"Pediatric Dentistry",description:"Gentle care for children, including exams, cleanings, fluoride treatments, and sealants.",duration:"30–60 min",from:"$90"
+    }
+
   ],
   appointments: [
     {patient:"Avery Johnson",email:"avery@example.test",doctor:"Dr. Maya Bennett",time:"09:00 AM",service:"General Dentistry",status:"Confirmed"},
