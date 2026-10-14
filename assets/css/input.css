@@ -1,0 +1,257 @@
+@import "tailwindcss";
+
+/* Tailwind scans these files for class names (including classes used inside app.js templates). */
+@source "../../*.html";
+@source "../js/*.js";
+
+/* ---------- Fonts (local, no Google Fonts) ---------- */
+@font-face {
+  font-family: 'DM Sans';
+  src: url('../fonts/DM_Sans/DMSans-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'DM Sans';
+  src: url('../fonts/DM_Sans/DMSans-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'DM Sans';
+  src: url('../fonts/DM_Sans/DMSans-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'DM Sans';
+  src: url('../fonts/DM_Sans/DMSans-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Manrope';
+  src: url('../fonts/Manrope/Manrope-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Manrope';
+  src: url('../fonts/Manrope/Manrope-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Manrope';
+  src: url('../fonts/Manrope/Manrope-ExtraBold.woff2') format('woff2');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@theme {
+    /* ---------- Fonts ---------- */
+    --font-sans: "DM Sans", sans-serif;
+    --font-display: "Manrope", sans-serif;
+
+    /* ---------- Colours (Everwell design) ---------- */
+    --color-primary: #B8E3D4;      /* mint  - buttons, highlights */
+    --color-secondary: #4AAE97;    /* teal  - accents */
+    --color-tertiary: #F1BD6A;     /* gold  - small details */
+    --color-grey-bg: #173B37;      /* panel surface */
+    --color-body-bg: #102D2A;      /* page background */
+    --color-body-gray: #0B2220;    /* darker sections */
+    /* Named palette (used as text-mint, bg-deep/70, text-muted ...) */
+    --color-ink: #102D2A;
+    --color-deep: #0B2220;
+    --color-panel: #173B37;
+    --color-mint: #B8E3D4;
+    --color-teal: #4AAE97;
+    --color-gold: #F1BD6A;
+    --color-sand: #F0E7D8;
+    --color-muted: #B4CBC3;
+    --color-line: rgba(222, 245, 237, 0.14);
+    /* ---------- Heading Typography ---------- */
+    /* Text Sizes */
+    --h1-size: 38px;
+    --h2-size: 32px;
+    --h3-size: 24px;
+    --h4-size: 20px;
+    --h5-size: 18px;
+    --h6-size: 16px;
+    /* Container Padding */
+    --container-px: clamp(20px, calc(20px + (30 - 20) * ((100vw - 390px) / (768 - 390))), 30px);
+    --nav-px: clamp(20px, calc(20px + (30 - 20) * ((100vw - 390px) / (768 - 390))), 30px);
+    --container-pt: clamp(120px, calc(120px + (160 - 120) * ((100vw - 390px) / (768 - 390))), 160px);
+    /* Paragraph text size */
+    --p-size: 14px;
+    /* ************* Line Hieghts ************** */
+    --h1-line-height: clamp(48px, calc(48px + 10 * ((100vw - 320px) / 448)), 58px);
+    --h2-line-height: clamp(40px, calc(40px + 4 * ((100vw - 320px) / 448)), 44px);
+    --h3-line-height: clamp(32px, calc(32px + 3 * ((100vw - 320px) / 448)), 35px);
+    --h4-line-height: clamp(30px, calc(30px + 2 * ((100vw - 320px) / 448)), 32px);
+    --h5-line-height: 28px;
+    --h6-line-height: 24px;
+    --p-line-height: 24px;
+    /* Max content width (content never gets wider than this) */
+    --page-max: 1420px;
+}
+
+:root { color-scheme: dark; }
+
+/* ------ H1 ------*/
+/* Tablet: 768px to 1280px */
+@media (min-width: 390px) {
+    :root{
+        --h1-size: clamp(38px, calc(38px + 10 * ((100vw - 390px) / 448)), 48px);
+        --h2-size: clamp(32px, calc(32px + 4 * ((100vw - 390px) / 448)), 36px);
+        --h3-size: clamp(24px, calc(24px + 4 * ((100vw - 390px) / 448)), 28px);
+        --h4-size: clamp(20px, calc(20px + 4 * ((100vw - 390px) / 448)), 24px);
+        --h5-size: 18px;
+        --h6-size: 16px;
+        --p-size: clamp(14px, calc(14px + (16 - 14) * ((100vw - 390px) / (768 - 390))), 16px);
+        --p-line-height: clamp(24px, calc(24px + 4 * ((100vw - 390px) / 448)), 28px);
+    }
+}
+@media (min-width: 768px) {
+    :root {
+        --h1-size: clamp(48px, calc(48px + 8 * ((100vw - 768px) / 512)), 56px);
+        --h2-size: clamp(36px, calc(36px + 6 * ((100vw - 768px) / 512)), 42px);
+        --h3-size: clamp(28px, calc(28px + 4 * ((100vw - 768px) / 512)), 32px);
+        --h4-size: 24px;
+        --h5-size: clamp(18px, calc(18px + 2 * ((100vw - 768px) / 512)), 20px);
+        --h6-size: clamp(16px, calc(16px + 2 * ((100vw - 768px) / 512)), 18px);
+        --p-size:  clamp(16px, calc(16px + 2 * ((100vw - 768px) / 512)), 18px);
+        --container-px: clamp(30px, calc(30px + (80 - 30) * ((100vw - 768px) / (1280 - 768))), 80px);
+        --nav-px: clamp(30px, calc(30px + (80 - 30) * ((100vw - 768px) / (1280 - 768))), 80px);
+        --container-pt: clamp(160px, calc(160px + (200 - 160) * ((100vw - 768px) / (1280 - 768))), 200px);
+        --h1-line-height: clamp(58px, calc(58px + 8 * ((100vw - 768px) / 512)), 66px);
+        --h2-line-height: clamp(44px, calc(44px + 8 * ((100vw - 768px) / 512)), 52px);
+        --h3-line-height: clamp(35px, calc(35px + 5 * ((100vw - 768px) / 512)), 40px);
+        --h4-line-height: clamp(32px, calc(32px + 3 * ((100vw - 768px) / 512)), 35px);
+        --h5-line-height: clamp(28px, calc(28px + 4 * ((100vw - 768px) / 512)), 32px);
+        --h6-line-height: clamp(24px, calc(24px + 6 * ((100vw - 768px) / 512)), 30px);
+        --p-line-height: clamp(28px, calc(28px + 2 * ((100vw - 768px) / 512)), 30px);
+    }
+}
+
+/* Desktop: 1280px to 1680px */
+@media (min-width: 1280px) {
+    :root {
+        --container-px: clamp(80px, calc(80px + 100 * ((100vw - 1280px) / 400)), 100px);
+        --nav-px: clamp(80px, calc(80px + 100 * ((100vw - 1280px) / 400)), 100px);
+        --h1-size: clamp(56px, calc(56px + 4 * ((100vw - 1280px) / 400)), 60px);
+        --h2-size: clamp(42px, calc(42px + 2 * ((100vw - 1280px) / 400)), 44px);
+        --h3-size: 32px;
+        --h4-size: clamp(24px, calc(24px + 4 * ((100vw - 1280px) / 400)), 28px);
+        --h5-size: clamp(20px, calc(20px + 4 * ((100vw - 1280px) / 400)), 24px);
+        --h6-size: clamp(18px, calc(18px + 2 * ((100vw - 1280px) / 400)), 20px);
+        --p-size: clamp(18px, calc(18px + 2 * ((100vw - 1280px) / 400)), 20px);
+    }
+}
+
+/* Large Desktop: 1680px to 1920px */
+@media (min-width: 1680px) {
+    :root {
+        --container-px: clamp(100px, calc(100px + 100 * ((100vw - 1680px) / 240)), 200px);
+        --nav-px: clamp(100px, calc(100px + 100 * ((100vw - 1680px) / 240)), 200px);
+    }
+}
+@media (min-width: 1920px){
+    :root {
+        --h1-size: 60px;
+        --h2-size: 44px;
+        --p-size: 20px;
+        --container-px: 250px;
+        --nav-px: 250px;
+    }
+}
+@media (min-width: 2120px){
+    :root {
+        --container-px: 0px !important;
+        --nav-px: 0px !important;
+    }
+}
+
+/* ---------- Base ---------- */
+body{
+    font-family: "DM Sans", sans-serif;
+}
+.text-h1{
+    font-size: var(--h1-size);
+    font-weight: 800;
+    line-height: var(--h1-line-height);
+    font-family: "Manrope", sans-serif;
+}
+.text-h2{
+    font-size: var(--h2-size);
+    font-weight: 800;
+    line-height: var(--h2-line-height);
+    font-family: "Manrope", sans-serif;
+}
+.text-h3{
+    font-size: var(--h3-size);
+    font-weight: 800;
+    line-height: var(--h3-line-height);
+    font-family: "Manrope", sans-serif;
+}
+.text-h4{
+    font-size: var(--h4-size);
+    font-weight: 800;
+    line-height: var(--h4-line-height);
+    font-family: "Manrope", sans-serif;
+}
+.text-h5{
+    font-size: var(--h5-size);
+    font-weight: 800;
+    line-height: var(--h5-line-height);
+    font-family: "Manrope", sans-serif;
+}
+.text-h6{
+    font-size: var(--h6-size);
+    font-weight: 800;
+    line-height: var(--h6-line-height);
+    font-family: "Manrope", sans-serif;
+}
+.text-p{
+    font-size: var(--p-size);
+    line-height: var(--p-line-height);
+}
+.container-px{
+    padding-left: var(--container-px);
+    padding-right: var(--container-px);
+}
+.nav-px{
+    padding-left: var(--nav-px);
+    padding-right: var(--nav-px);
+}
+.container-pt{
+    padding-top: var(--container-pt);
+}
+/* Centres content and caps it at --page-max; use together with .container-px */
+.page-wrap{
+    width: 100%;
+    max-width: calc(var(--page-max) + 2 * var(--container-px));
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* ---------- Accessibility ---------- */
+html{ scroll-behavior: smooth; }
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible{
+    outline: 3px solid var(--color-gold);
+    outline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce){
+    html{ scroll-behavior: auto; }
+    *, *::before, *::after{ transition: none !important; }
+}
+
+/* ---------- Components (header, cards, forms, dashboards ...) ---------- */
+@import "./components.css";

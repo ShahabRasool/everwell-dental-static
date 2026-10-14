@@ -1,0 +1,54 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport"
+            content="width=device-width, initial-scale=1"><title>Doctor
+            Dashboard | Everwell Dental</title><link rel="stylesheet"
+            href="assets/css/style.css">
+        </head>
+        <body
+        data-page="doctor-dashboard">
+        <div id="site-header">
+
+        </div>
+        <main
+            class="page-wrap container-px py-12"><p class="eyebrow">DOCTOR
+                WORKSPACE</p><h1 class="section-title mt-3">My
+                appointments</h1><p class="text-muted mt-3">Select a doctor to
+                preview that doctor's own assigned appointment list. Use
+                Previous / Next to move through bookings.</p><div
+                class="dashboard-panel mt-7"><label
+                    class="block text-sm font-semibold mb-2"
+                    for="doctor-dashboard-select">Doctor profile</label><select
+                    id="doctor-dashboard-select"
+                    class="field max-w-xl"></select>
+                    <div
+                    id="doctor-dashboard-profile" class="mt-6">
+                </div>
+            </div>
+            <div
+                class="mt-6">
+                <div class="panel-heading">
+                    <div>
+                        <h2
+                            class="text-h4">Assigned appointment list</h2><p
+                            class="text-muted mt-1">Demo bookings for the
+                            selected doctor only.</p>
+                        </div>
+                        <a
+                        href="booking.html" class="btn-primary">＋ New
+                        booking</a>
+                    </div>
+                        <div id="doctor-dashboard-appointments"
+                    class="mt-5 grid gap-4">
+                </div>
+                </div>
+                <div
+                class="schedule-note mt-6"><span>i</span>
+                <p>Static preview: the
+                    doctor selector is not secure authentication. In Drupal, use
+                    user roles and access checks so each doctor can see only
+                    their own patient appointments.</p>
+                </div>
+                </main>
+                    <div
+            id="site-footer"></div><script
+            src="assets/js/data.js"></script><script
+            src="assets/js/app.js"></script></body></html>
