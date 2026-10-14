@@ -91,7 +91,8 @@
   const STORAGE = {
     appointments: 'everwellAppointments',
     lastUpdate:   'everwellLastUpdate',
-    adminNotice:  'everwellAdminNotification'
+    adminNotice:  'everwellAdminNotification',
+    dashboardNotifications: 'everwellDashboardNotifications'
   };
 
   /** First visit: turn data.appointments (data.js) into full appointment records. */
@@ -105,7 +106,9 @@
       clinic: 'Everwell Dental — Downtown',
       reason: a.service,
       notes: 'Sample appointment for design review.',
-      status: a.status === 'Pending' ? 'Pending review' : a.status
+      status: a.status === 'Pending' ? 'Pending review' : a.status,
+      queueStatus: 'waiting',
+      notified: false
     }));
     localStorage.setItem(STORAGE.appointments, JSON.stringify(seeded));
     return seeded;
@@ -133,6 +136,79 @@
     catch (e) { return null; }
   };
 
+  /* ---- Dashboard notification center + patient queue ---------------- */
+  const getDashboardNotifications = () => readJSON(STORAGE.dashboardNotifications, []);
+  const addDashboardNotification = notification => {
+    const items = getDashboardNotifications();
+    items.unshift({ ...notification, id: `AL-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`, createdAt: new Date().toISOString(), read: false });
+    localStorage.setItem(STORAGE.dashboardNotifications, JSON.stringify(items.slice(0, 100)));
+    localStorage.setItem(STORAGE.lastUpdate, String(Date.now()));
+    window.dispatchEvent(new Event('everwell:notification'));
+  };
+  const queueLabel = appointment => appointment.queueStatus === 'called' ? 'Called' : appointment.queueStatus === 'checked-in' ? 'Checked in' : 'Waiting';
+  const notifyPatient = (appointment, type, message, channels = ['SMS', 'WhatsApp']) => addNotification({ appointmentId: appointment.id, patient: appointment.patient, doctorId: appointment.doctorId, channels, type, message });
+
+  /* ---- Emergency workflow storage (demo only) ----------------------- */
+  const EMERGENCY_KEYS = {
+    statuses: 'everwellDoctorStatuses',
+    notifications: 'everwellPatientNotifications'
+  };
+  const readJSON = (key, fallback) => {
+    try {
+      const value = JSON.parse(localStorage.getItem(key) || 'null');
+      return value ?? fallback;
+    } catch (e) { return fallback; }
+  };
+  const saveJSON = (key, value) => localStorage.setItem(key, JSON.stringify(value));
+  const getDoctorStatuses = () => readJSON(EMERGENCY_KEYS.statuses, {});
+  const getDoctorStatus = doctorId => getDoctorStatuses()[doctorId] || { status: 'Available' };
+  const setDoctorStatus = (doctorId, status) => {
+    const statuses = getDoctorStatuses();
+    statuses[doctorId] = status;
+    saveJSON(EMERGENCY_KEYS.statuses, statuses);
+    window.dispatchEvent(new Event('everwell:updated'));
+  };
+  const getNotifications = () => readJSON(EMERGENCY_KEYS.notifications, []);
+  const addNotification = notification => {
+    const notifications = getNotifications();
+    notifications.unshift({ ...notification, id: `NT-${Date.now()}`, sentAt: new Date().toISOString(), delivery: 'Delivered (demo)' });
+    saveJSON(EMERGENCY_KEYS.notifications, notifications.slice(0, 100));
+  };
+  const timeToMinutes = value => {
+    const match = String(value || '').match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+    if (!match) return null;
+    let hour = Number(match[1]);
+    if (match[3].toUpperCase() === 'PM' && hour !== 12) hour += 12;
+    if (match[3].toUpperCase() === 'AM' && hour === 12) hour = 0;
+    return hour * 60 + Number(match[2]);
+  };
+  const emergencyIsActive = status => status?.status === 'Emergency Away' && (!status.until || new Date(status.until).getTime() > Date.now());
+  const isUrgentAppointment = appointment => /severe|pain|emergency|swelling/i.test(`${appointment.reason || ''} ${appointment.notes || ''} ${appointment.service || ''}`);
+  const affectedByEmergency = (appointment, doctorId, emergency) => {
+    if (appointment.doctorId !== doctorId || !emergencyIsActive(emergency)) return false;
+    if (emergency.duration === 'specific-date') return appointment.date === emergency.date;
+    if (emergency.duration === 'whole-day') return appointment.date === todayISO();
+    if (emergency.duration === '2-hours') {
+      if (appointment.date !== todayISO()) return false;
+      const appointmentMinutes = timeToMinutes(appointment.time);
+      const now = new Date();
+      const nowMinutes = now.getHours() * 60 + now.getMinutes();
+      return appointmentMinutes === null || (appointmentMinutes >= nowMinutes && appointmentMinutes <= nowMinutes + 120);
+    }
+    return false;
+  };
+  const notifyAffectedPatients = (doctor, affected, emergency) => {
+    affected.forEach(appointment => addNotification({
+      appointmentId: appointment.id,
+      patient: appointment.patient,
+      channels: ['SMS', 'WhatsApp', 'Email'],
+      message: `Dear ${appointment.patient}, due to an emergency, ${doctor.name} is unavailable. We apologize for the inconvenience. Please reschedule or connect with our receptionist.`,
+      type: 'Emergency availability alert',
+      doctorId: doctor.id,
+      duration: emergency.duration
+    }));
+  };
+
 
   /* ===================================================================
      3. SITE LAYOUT — header & footer  (injected on every page)
@@ -152,6 +228,75 @@
     <a class="brand" href="index.html"${ariaLabel ? ` aria-label="${ariaLabel}"` : ''}>
       <span class="brand-mark">✦</span><span>everwell<small>D E N T A L</small></span>
     </a>`;
+
+  const showDashboardToast = notification => {
+    const toast = document.createElement('div');
+    toast.className = 'alert-toast';
+    toast.innerHTML = `<strong>🔔 New patient alert</strong><p>${esc(notification.message)}</p>`;
+    document.body.appendChild(toast);
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (AudioContext) {
+        const context = new AudioContext();
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        oscillator.frequency.value = 880;
+        gain.gain.setValueAtTime(0.04, context.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.25);
+        oscillator.connect(gain).connect(context.destination);
+        oscillator.start(); oscillator.stop(context.currentTime + 0.25);
+      }
+    } catch (e) { /* browser audio permission is optional in this demo */ }
+    setTimeout(() => toast.remove(), 5000);
+  };
+
+  const renderNotificationCenter = () => {
+    if (!['dashboard', 'doctor-dashboard'].includes(page)) return;
+    const host = document.createElement('div');
+    host.id = 'notification-center';
+    host.className = 'notification-center';
+    host.innerHTML = `<button id="notification-bell" class="notification-bell" type="button" aria-expanded="false" aria-controls="notification-dropdown">🔔<span id="notification-badge" class="notification-badge" hidden>0</span></button><div id="notification-dropdown" class="notification-dropdown" hidden><div class="notification-dropdown-heading"><strong>Notifications</strong><span>Live queue alerts</span></div><div id="notification-items"></div></div>`;
+    const navWrap = document.querySelector('.nav-wrap');
+    navWrap?.querySelector('.nav-cta')?.before(host);
+    const bell = $('notification-bell');
+    const dropdown = $('notification-dropdown');
+    let lastKnown = new Set(getDashboardNotifications().map(n => n.id));
+    const relevant = () => {
+      const selectedDoctor = params.get('doctor');
+      return getDashboardNotifications().filter(n => page === 'dashboard' || (n.audience !== 'clinic' && (!selectedDoctor || n.doctorId === selectedDoctor)));
+    };
+    const render = () => {
+      const items = relevant();
+      const unread = items.filter(n => !n.read).length;
+      const badge = $('notification-badge');
+      badge.hidden = !unread;
+      badge.textContent = unread > 9 ? '9+' : unread;
+      $('notification-items').innerHTML = items.length ? items.slice(0, 12).map(n => `<div class="notification-item ${n.read ? '' : 'unread'}"><span class="notification-item-icon">${n.type === 'Patient arrived' ? '🏥' : '🕒'}</span><div><strong>${esc(n.message)}</strong><small>${new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · ${esc(n.type)}</small></div></div>`).join('') : '<p class="notification-empty">No new patient alerts.</p>';
+    };
+    const markRead = () => {
+      const ids = new Set(relevant().map(n => n.id));
+      const updated = getDashboardNotifications().map(n => ids.has(n.id) ? { ...n, read: true } : n);
+      localStorage.setItem(STORAGE.dashboardNotifications, JSON.stringify(updated));
+      render();
+    };
+    bell.addEventListener('click', () => {
+      const open = dropdown.hidden;
+      dropdown.hidden = !open;
+      bell.setAttribute('aria-expanded', String(open));
+      if (open) markRead();
+    });
+    const poll = () => {
+      const items = relevant();
+      const latest = items.find(n => !lastKnown.has(n.id));
+      if (latest && document.visibilityState !== 'hidden') showDashboardToast(latest);
+      lastKnown = new Set(getDashboardNotifications().map(n => n.id));
+      render();
+    };
+    window.addEventListener('everwell:notification', poll);
+    window.addEventListener('storage', poll);
+    setInterval(poll, 5000);
+    render();
+  };
 
   const renderHeader = () => {
     const host = $('site-header');
@@ -173,6 +318,8 @@
           <a class="nav-cta" href="booking.html">Book appointment ↗</a>
         </div>
       </header>`;
+
+    renderNotificationCenter();
 
     // Mobile menu open / close
     const toggle = $('menu-toggle');
@@ -262,6 +409,7 @@
         <div class="doctor-meta">
           <span>⌖ ${esc(d.clinic)} clinic</span>
           <span>◷ ${esc(d.hours.split('–')[0].trim())}</span>
+          <span class="public-doctor-status">● ${esc(getDoctorStatus(d.id).status || 'Available')}</span>
         </div>
         <div class="flex flex-wrap gap-2 mt-4">
           <a class="small-action" href="doctor.html?doctor=${url(d.id)}">View profile ↗</a>
@@ -409,11 +557,39 @@
 
     // -- Initial state (URL: ?doctor=dr-maya&service=General%20Dentistry)
     doctorSelect.innerHTML = '<option value="">Select a doctor</option>';
-    data.doctors.forEach(d => doctorSelect.add(new Option(`${d.name} — ${d.specialty} · ${d.clinic}`, d.id)));
+    data.doctors.forEach(d => {
+      const option = new Option(`${d.name} — ${d.specialty} · ${d.clinic}`, d.id);
+      if (emergencyIsActive(getDoctorStatus(d.id))) {
+        option.disabled = true;
+        option.textContent += ' · Emergency unavailable';
+      }
+      doctorSelect.add(option);
+    });
     if (findDoctor(params.get('doctor'))) doctorSelect.value = params.get('doctor');
     fillServices(allServiceNames, params.get('service') || '');
     syncServiceWithDoctor();
-    doctorSelect.addEventListener('change', syncServiceWithDoctor);
+    doctorSelect.addEventListener('change', () => { syncServiceWithDoctor(); updateBookingStatus(); });
+    const bookingStatus = document.createElement('div');
+    bookingStatus.className = 'notice-banner booking-status-notice mt-4';
+    bookingStatus.hidden = true;
+    doctorSelect.closest('.form-group')?.appendChild(bookingStatus);
+    const updateBookingStatus = () => {
+      const selectedDoctor = findDoctor(doctorSelect.value);
+      const status = selectedDoctor && getDoctorStatus(selectedDoctor.id);
+      if (selectedDoctor && emergencyIsActive(status)) {
+        bookingStatus.hidden = false;
+        bookingStatus.textContent = `🚨 ${selectedDoctor.name} is marked Emergency Away. Please choose another doctor.`;
+        doctorSelect.value = '';
+        syncServiceWithDoctor();
+      } else if (selectedDoctor && status?.status && status.status !== 'Available') {
+        bookingStatus.hidden = false;
+        bookingStatus.textContent = `ℹ️ ${selectedDoctor.name} is currently ${status.status}. Please confirm your appointment time with reception.`;
+      } else {
+        bookingStatus.hidden = true;
+      }
+    };
+    window.addEventListener('everwell:updated', updateBookingStatus);
+    updateBookingStatus();
 
     // -- Date: past dates not allowed
     dateInput.min = todayISO();
@@ -465,6 +641,10 @@
         alert('Please select a doctor for this service.');
         return;
       }
+      if (emergencyIsActive(getDoctorStatus(doctor.id))) {
+        alert(`${doctor.name} is currently unavailable due to an emergency. Please choose another doctor.`);
+        return;
+      }
 
       const id = `EW-${Math.random().toString(36).slice(2, 6).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
       const appointment = {
@@ -481,12 +661,20 @@
         reason: f.get('reason'),
         notes: f.get('notes'),
         status: 'Pending review',
+        queueStatus: 'waiting',
+        notified: false,
         createdAt: new Date().toISOString()
       };
 
       const rows = readAppointments();
       rows.unshift(appointment);                        // newest first
       saveAppointments(rows);
+      addDashboardNotification({
+        doctorId: doctor.id,
+        patient: appointment.patient,
+        type: 'New online booking',
+        message: `New patient ${appointment.patient} booked ${appointment.service} and is waiting in the queue.`
+      });
       setAdminNotice(`New appointment request from ${appointment.patient} for ${doctor.name}. Please review booking ${id}.`, id);
       showConfirmation(appointment, doctor);
     });
@@ -528,6 +716,75 @@
       showDoctor: true,
       getRows: () => readAppointments()
     });
+
+    // Emergency queue: affected patients, reassignment, reschedule, refund and notification history.
+    const emergencyPanel = document.createElement('section');
+    emergencyPanel.className = 'dashboard-panel emergency-queue-panel mt-6';
+    emergencyPanel.hidden = true;
+    $('admin-notice')?.insertAdjacentElement('afterend', emergencyPanel);
+    const getEmergencyGroups = () => {
+      const statuses = getDoctorStatuses();
+      return data.doctors.map(doctor => {
+        const emergency = statuses[doctor.id];
+        const affected = readAppointments().filter(a => a.doctorId === doctor.id && (a.emergencyAffected || affectedByEmergency(a, doctor.id, emergency)) && emergencyIsActive(emergency));
+        return { doctor, emergency, affected };
+      }).filter(group => group.affected.length);
+    };
+    const notificationHistoryHTML = () => {
+      const notifications = getNotifications().slice(0, 8);
+      return notifications.length ? `<div class="notification-history mt-5"><h3>Patient notification history</h3>${notifications.map(n => `<div class="notification-history-row"><span class="notification-icon">✓</span><div><strong>${esc(n.patient)} · ${esc(n.type)}</strong><small>${esc(n.channels.join(' / '))} · ${esc(n.delivery)}</small></div><time>${new Date(n.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time></div>`).join('')}</div>` : '';
+    };
+    const renderEmergencyQueue = () => {
+      const groups = getEmergencyGroups();
+      emergencyPanel.hidden = !groups.length;
+      if (!groups.length) return;
+      const groupHTML = group => {
+        const appointmentHTML = group.affected.map(a => `
+          <div class="emergency-appointment-row">
+            <div><strong>${isUrgentAppointment(a) ? '⚠️ ' : ''}${esc(a.patient)}</strong><small>${esc(a.date || 'Date not set')} · ${esc(a.time)} · ${esc(a.service)}${isUrgentAppointment(a) ? ' · Urgent' : ''}</small></div>
+            <div class="appointment-actions"><button class="small-action" data-emergency-action="reschedule" data-id="${esc(a.id)}" type="button">Send reschedule link</button><button class="small-action danger" data-emergency-action="cancel-refund" data-id="${esc(a.id)}" type="button">Cancel / refund</button></div>
+          </div>`).join('');
+        const doctorOptions = data.doctors.filter(d => d.id !== group.doctor.id && !emergencyIsActive(getDoctorStatus(d.id))).map(d => `<option value="${esc(d.id)}">${esc(d.name)}</option>`).join('');
+        return `<div class="emergency-group"><div class="emergency-group-heading"><div><h3>${esc(group.doctor.name)}</h3><p>${esc(group.doctor.specialty)} · ${group.affected.length} affected appointment${group.affected.length === 1 ? '' : 's'}</p></div><div class="emergency-actions"><select class="field" data-reassign-select="${esc(group.doctor.id)}"><option value="">Reassign to…</option>${doctorOptions}</select><button class="small-action" data-emergency-action="reassign-all" data-doctor-id="${esc(group.doctor.id)}" type="button">Reassign all</button></div></div>${appointmentHTML}</div>`;
+      };
+      emergencyPanel.innerHTML = `<div class="panel-heading"><div><p class="eyebrow emergency-eyebrow">EMERGENCY QUEUE</p><h2>🚨 ${groups.reduce((count, group) => count + group.affected.length, 0)} appointments affected</h2><p>Patients have been notified through SMS, WhatsApp and email in this demo.</p></div><span class="status-pill emergency-status">Emergency Away</span></div>${groups.map(groupHTML).join('')}${notificationHistoryHTML()}`;
+    };
+    const emergencyAction = (action, id) => {
+      const groups = getEmergencyGroups();
+      const group = groups.find(x => x.affected.some(a => a.id === id));
+      const appointment = readAppointments().find(a => a.id === id);
+      if (!appointment) return;
+      if (action === 'reschedule') {
+        saveAppointments(readAppointments().map(a => a.id === id ? { ...a, status: 'Reschedule requested', emergencyStatus: 'Patient choosing new slot' } : a));
+        addNotification({ appointmentId: id, patient: appointment.patient, channels: ['WhatsApp', 'Email'], type: 'Reschedule link', message: `Choose a new appointment time: demo-reschedule/${id}` });
+      } else if (action === 'cancel-refund') {
+        saveAppointments(readAppointments().map(a => a.id === id ? { ...a, status: 'Cancelled', paymentStatus: 'Refunded (demo)', emergencyStatus: 'Cancelled and refunded' } : a));
+        addNotification({ appointmentId: id, patient: appointment.patient, channels: ['SMS', 'Email'], type: 'Cancellation and refund', message: 'Your appointment was cancelled and the demo refund was initiated.' });
+      }
+      setAdminNotice(`${appointment.patient}'s emergency appointment was updated: ${action === 'reschedule' ? 'reschedule link sent' : 'cancelled and refunded'}.`, id);
+      renderEmergencyQueue();
+      render();
+      schedule.render();
+    };
+    emergencyPanel.addEventListener('click', event => {
+      const button = event.target.closest('[data-emergency-action]');
+      if (!button) return;
+      const action = button.dataset.emergencyAction;
+      if (action === 'reassign-all') {
+        const select = emergencyPanel.querySelector(`[data-reassign-select="${button.dataset.doctorId}"]`);
+        const substitute = findDoctor(select?.value);
+        if (!substitute) { alert('Choose an alternate doctor first.'); return; }
+        const group = getEmergencyGroups().find(x => x.doctor.id === button.dataset.doctorId);
+        const ids = new Set(group?.affected.map(a => a.id));
+        saveAppointments(readAppointments().map(a => ids.has(a.id) ? { ...a, doctorId: substitute.id, doctor: substitute.name, emergencyAffected: false, emergencyStatus: 'Reassigned' } : a));
+        group?.affected.forEach(a => addNotification({ appointmentId: a.id, patient: a.patient, channels: ['SMS', 'WhatsApp', 'Email'], type: 'Doctor reassigned', message: `Your appointment has been reassigned to ${substitute.name}.` }));
+        setAdminNotice(`${ids.size} appointment${ids.size === 1 ? '' : 's'} reassigned to ${substitute.name}.`, group?.affected[0]?.id);
+        renderEmergencyQueue(); render(); schedule.render();
+      } else emergencyAction(action, button.dataset.id);
+    });
+    window.addEventListener('everwell:updated', renderEmergencyQueue);
+    window.addEventListener('storage', renderEmergencyQueue);
+    renderEmergencyQueue();
 
     // -- Top cards + notice banner
     const updateMetrics = () => {
@@ -580,14 +837,15 @@
     };
 
     // -- Table row actions
-    const rowActions = a => isPending(a)
+    const rowActions = a => `${isPending(a)
       ? `<button class="small-action" data-action="Confirmed" data-id="${esc(a.id)}">Approve</button>
          <button class="small-action danger" data-action="Rejected" data-id="${esc(a.id)}">Reject</button>`
-      : `<button class="small-action" data-open-appointment="${esc(a.id)}">View</button>`;
+      : `<button class="small-action" data-open-appointment="${esc(a.id)}">View</button>`}
+      ${a.queueStatus === 'checked-in' ? '<span class="queue-state">✓ Checked in</span>' : `<button class="small-action" data-queue-action="check-in" data-id="${esc(a.id)}">Check in</button>`}`;
 
     const tableRow = a => `
       <tr>
-        <td><button class="text-left" data-open-appointment="${esc(a.id)}"><strong>${esc(a.patient)}</strong><small class="block text-muted">${esc(a.id)}</small></button></td>
+        <td><button class="text-left" data-open-appointment="${esc(a.id)}"><strong>${isUrgentAppointment(a) ? '⚠️ ' : ''}${esc(a.patient)}</strong><small class="block text-muted">${esc(a.id)}${isUrgentAppointment(a) ? ' · Urgent' : ''}</small></button></td>
         <td>${esc(a.doctor)}</td>
         <td>${esc(a.date || '—')}<small class="block text-muted">${esc(a.time)}</small></td>
         <td>${esc(a.service)}</td>
@@ -622,6 +880,20 @@
       saveAppointments(rows);
       const a = rows.find(x => x.id === id);
       setAdminNotice(`${a.patient}'s appointment ${id} was marked ${status}.`, id);
+      if (status === 'Confirmed' && a) {
+        addDashboardNotification({ doctorId: a.doctorId, patient: a.patient, type: 'Booking confirmed', message: `${a.patient}'s ${a.service} appointment is confirmed and waiting in the queue.` });
+      }
+      render();
+      schedule.render();
+    };
+
+    const checkInPatient = id => {
+      const appointment = readAppointments().find(a => a.id === id);
+      if (!appointment) return;
+      const updated = readAppointments().map(a => a.id === id ? { ...a, queueStatus: 'checked-in', notified: false } : a);
+      saveAppointments(updated);
+      addDashboardNotification({ doctorId: appointment.doctorId, patient: appointment.patient, type: 'Patient arrived', message: `Patient ${appointment.patient} has arrived at reception and is in the queue.` });
+      setAdminNotice(`🏥 ${appointment.patient} checked in at reception and is waiting for ${appointment.doctor}.`, id);
       render();
       schedule.render();
     };
@@ -629,8 +901,10 @@
     // -- Events
     tableBody.addEventListener('click', e => {
       const action = e.target.closest('[data-action]');
+      const queueAction = e.target.closest('[data-queue-action]');
       const open = e.target.closest('[data-open-appointment]');
       if (action) changeStatus(action.dataset.id, action.dataset.action);
+      else if (queueAction) checkInPatient(queueAction.dataset.id);
       else if (open) renderDetail(open.dataset.openAppointment);
     });
 
@@ -666,7 +940,7 @@
       const all = readAppointments();
       doctorLinks.innerHTML = data.doctors.map(d => `
         <a class="doctor-list-link" href="doctor-dashboard.html?doctor=${url(d.id)}">
-          <span><strong>${esc(d.name)}</strong><small class="block text-muted">${esc(d.specialty)} · ${all.filter(a => a.doctorId === d.id).length} appointment(s)</small></span>
+          <span><strong>${esc(d.name)}</strong><small class="block text-muted">${esc(d.specialty)} · ${esc(getDoctorStatus(d.id).status || 'Available')} · ${all.filter(a => a.doctorId === d.id).length} appointment(s)</small></span>
           <b>Open ↗</b>
         </a>`).join('');
     }
@@ -694,6 +968,9 @@
       const d = findDoctor(select.value);
       const host = $('doctor-dashboard-profile');
       if (!host || !d) return;
+      const todayRows = getDoctorRows().filter(a => a.date === todayISO());
+      const arrivedToday = todayRows.filter(a => a.queueStatus === 'checked-in' || a.queueStatus === 'called').length;
+      const cancelledToday = todayRows.filter(a => a.status === 'Cancelled' || a.status === 'Rejected').length;
       host.innerHTML = `
         <div class="flex items-center gap-4">
           <img src="${esc(d.image)}" alt="" style="width:76px;height:76px;object-fit:cover;border-radius:16px">
@@ -702,8 +979,68 @@
             <p class="text-muted">${esc(d.credentials)} · ${esc(d.specialty)} · ${esc(d.experience)}</p>
             <p class="text-muted">${esc(d.clinic)} clinic · ${esc(d.days)} · ${esc(d.hours)}</p>
             <a class="text-link" href="doctor.html?doctor=${url(d.id)}">Open full profile ↗</a>
+            <div class="doctor-today-report mt-5"><div><small>Today’s patients</small><strong>${todayRows.length}</strong></div><div><small>Arrived / seen</small><strong>${arrivedToday}</strong></div><div><small>Cancelled</small><strong>${cancelledToday}</strong></div><div><small>Waiting</small><strong>${todayRows.filter(a => a.queueStatus !== 'called' && a.status !== 'Cancelled' && a.status !== 'Rejected').length}</strong></div></div>
+            <div class="emergency-controls mt-5">
+              <div class="status-control-row"><label class="text-sm font-semibold">Live status<select id="doctor-live-status" class="field mt-2"><option>Available</option><option>In Consultation</option><option>On Break</option><option>Emergency Away</option></select></label><span id="doctor-status-label" class="status-pill">Available</span></div>
+              <div id="emergency-form" class="emergency-form mt-4" hidden>
+                <label class="text-sm font-semibold">Unavailable for<select id="emergency-duration" class="field mt-2"><option value="2-hours">Next 2 hours</option><option value="whole-day">Whole day</option><option value="specific-date">Specific date</option></select></label>
+                <label id="emergency-date-wrap" class="text-sm font-semibold" hidden>Unavailable date<input id="emergency-date" class="field mt-2" type="date" min="${todayISO()}"></label>
+                <label class="text-sm font-semibold">Alternate doctor<select id="emergency-substitute" class="field mt-2"><option value="">No substitute</option>${data.doctors.filter(x=>x.id!==d.id && !emergencyIsActive(getDoctorStatus(x.id))).map(x=>`<option value="${esc(x.id)}">${esc(x.name)}</option>`).join('')}</select></label>
+                <button id="confirm-emergency" class="small-action danger mt-3" type="button">Mark unavailable & notify patients</button>
+              </div>
+            </div>
           </div>
         </div>`;
+      const currentStatus = getDoctorStatus(d.id);
+      const statusSelect = $('doctor-live-status');
+      const statusLabel = $('doctor-status-label');
+      const emergencyForm = $('emergency-form');
+      const durationSelect = $('emergency-duration');
+      const dateWrap = $('emergency-date-wrap');
+      const emergencyDate = $('emergency-date');
+      const syncEmergencyUI = () => {
+        const status = statusSelect.value;
+        statusLabel.textContent = status;
+        statusLabel.className = `status-pill ${status === 'Emergency Away' ? 'emergency-status' : ''}`;
+        emergencyForm.hidden = status !== 'Emergency Away';
+        dateWrap.hidden = durationSelect.value !== 'specific-date';
+      };
+      statusSelect.value = currentStatus.status || 'Available';
+      if (currentStatus.duration) durationSelect.value = currentStatus.duration;
+      if (currentStatus.date) emergencyDate.value = currentStatus.date;
+      syncEmergencyUI();
+      statusSelect.addEventListener('change', () => {
+        if (statusSelect.value !== 'Emergency Away') {
+          const nextStatus = { status: statusSelect.value, updatedAt: new Date().toISOString() };
+          setDoctorStatus(d.id, nextStatus);
+          addDashboardNotification({ audience: 'clinic', doctorId: d.id, type: 'Doctor status changed', message: `${d.name} is now ${nextStatus.status}.` });
+          syncEmergencyUI();
+          return;
+        }
+        syncEmergencyUI();
+      });
+      durationSelect.addEventListener('change', syncEmergencyUI);
+      $('confirm-emergency').addEventListener('click', () => {
+        if (durationSelect.value === 'specific-date' && !emergencyDate.value) {
+          alert('Please choose the date for the emergency leave.');
+          return;
+        }
+        const duration = durationSelect.value;
+        const until = duration === '2-hours'
+          ? new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()
+          : duration === 'whole-day'
+            ? new Date(`${todayISO()}T23:59:59`).toISOString()
+            : new Date(`${emergencyDate.value}T23:59:59`).toISOString();
+        const emergency = { status: 'Emergency Away', duration, date: emergencyDate.value || todayISO(), until, substituteId: $('emergency-substitute').value, updatedAt: new Date().toISOString() };
+        const affected = readAppointments().filter(a => affectedByEmergency(a, d.id, emergency));
+        saveAppointments(readAppointments().map(a => affected.some(x => x.id === a.id) ? { ...a, emergencyAffected: true, emergencyDoctorId: d.id, emergencyStatus: 'Awaiting action' } : a));
+        setDoctorStatus(d.id, emergency);
+        addDashboardNotification({ audience: 'clinic', doctorId: d.id, type: 'Doctor status changed', message: `🚨 ${d.name} is now Emergency Away. ${affected.length} appointment${affected.length === 1 ? '' : 's'} may be affected.` });
+        notifyAffectedPatients(d, affected, emergency);
+        setAdminNotice(`🚨 ${affected.length} appointment${affected.length === 1 ? '' : 's'} affected by ${d.name}'s emergency.`, affected[0]?.id);
+        alert(`${d.name} is now unavailable. ${affected.length} patient notification${affected.length === 1 ? '' : 's'} recorded as delivered (demo).`);
+        render();
+      });
     };
 
     const render = () => {
@@ -734,6 +1071,15 @@
             ['Clinic', a.clinic || 'Everwell Dental'],
             ['Notes', a.notes || 'No additional notes']
           ])}
+          <details class="appointment-edit mt-5">
+            <summary>Change patient appointment</summary>
+            <form class="appointment-edit-form mt-4" data-edit-appointment="${esc(a.id)}">
+              <label>Date<input class="field mt-2" name="date" type="date" value="${esc(a.date || todayISO())}" min="${todayISO()}" required></label>
+              <label>Time<input class="field mt-2" name="time" value="${esc(a.time || '')}" required></label>
+              <label>Status<select class="field mt-2" name="status"><option ${a.status === 'Confirmed' ? 'selected' : ''}>Confirmed</option><option ${a.status === 'Pending review' ? 'selected' : ''}>Pending review</option><option ${a.status === 'Reschedule requested' ? 'selected' : ''}>Reschedule requested</option><option ${a.status === 'Cancelled' ? 'selected' : ''}>Cancelled</option></select></label>
+              <button class="small-action mt-4" type="submit">Save appointment change</button>
+            </form>
+          </details>
         </article>
         <div class="pager">
           <button id="doctor-prev" type="button" class="small-action" ${current === 0 ? 'disabled' : ''}>← Previous</button>
@@ -746,6 +1092,23 @@
       $('doctor-next').addEventListener('click', () => { current = Math.min(rows.length - 1, current + 1); render(); });
     };
 
+    list.addEventListener('submit', event => {
+      const form = event.target.closest('[data-edit-appointment]');
+      if (!form) return;
+      event.preventDefault();
+      const appointment = readAppointments().find(a => a.id === form.dataset.editAppointment);
+      if (!appointment) return;
+      const values = new FormData(form);
+      const updated = { ...appointment, date: values.get('date'), time: values.get('time'), status: values.get('status'), queueStatus: values.get('status') === 'Cancelled' ? 'called' : appointment.queueStatus };
+      saveAppointments(readAppointments().map(a => a.id === updated.id ? updated : a));
+      notifyPatient(updated, 'Appointment updated', `Your appointment with ${updated.doctor} was updated to ${updated.date} at ${updated.time}.`, ['SMS', 'WhatsApp', 'Email']);
+      addDashboardNotification({ audience: 'clinic', doctorId: updated.doctorId, patient: updated.patient, type: 'Appointment updated', message: `${updated.patient}'s appointment was changed to ${updated.date} at ${updated.time}.` });
+      setAdminNotice(`${updated.patient}'s appointment was updated by ${updated.doctor}.`, updated.id);
+      render();
+      renderQueue();
+      schedule.render();
+    });
+
     // Date-wise schedule for the selected doctor
     const schedule = createSchedulePanel({
       after: list.parentElement,
@@ -756,10 +1119,36 @@
       getRows: getDoctorRows
     });
 
+    // Live patient queue for the selected doctor.
+    const queuePanel = document.createElement('section');
+    queuePanel.className = 'dashboard-panel patient-queue-panel mt-6';
+    list.parentElement.insertAdjacentElement('afterend', queuePanel);
+    const renderQueue = () => {
+      const queue = getDoctorRows().filter(a => a.queueStatus !== 'called');
+      queuePanel.innerHTML = `<div class="panel-heading"><div><p class="eyebrow">PATIENT QUEUE</p><h2>Patients waiting <span class="queue-count">${queue.length}</span></h2><p>Call the next patient to send an SMS / WhatsApp alert.</p></div><span class="status-pill queue-live">● Live</span></div>${queue.length ? `<div class="patient-queue-list">${queue.map((a, index) => `<div class="patient-queue-row"><div><strong>${index === 0 ? 'Next · ' : ''}${isUrgentAppointment(a) ? '⚠️ ' : ''}${esc(a.patient)}</strong><small>${esc(a.service)} · ${esc(a.time)} · ${queueLabel(a)}${isUrgentAppointment(a) ? ' · Urgent' : ''}</small></div><button class="small-action" data-call-patient="${esc(a.id)}" type="button">Call patient</button></div>`).join('')}</div>` : '<div class="empty-state">No patients are currently waiting in this queue.</div>'}`;
+    };
+    queuePanel.addEventListener('click', event => {
+      const button = event.target.closest('[data-call-patient]');
+      if (!button) return;
+      const appointment = readAppointments().find(a => a.id === button.dataset.callPatient);
+      const doctor = findDoctor(select.value);
+      if (!appointment || !doctor) return;
+      saveAppointments(readAppointments().map(a => a.id === appointment.id ? { ...a, queueStatus: 'called', notified: true } : a));
+      notifyPatient(appointment, 'Patient called', `Dr. ${doctor.name.replace(/^Dr\.\s*/, '')} is ready for you. Please proceed to the treatment room.`, ['SMS', 'WhatsApp']);
+      addDashboardNotification({ doctorId: doctor.id, patient: appointment.patient, type: 'Patient called', message: `${appointment.patient} was called from the queue.` });
+      renderQueue();
+      render();
+      schedule.render();
+    });
+    window.addEventListener('everwell:notification', renderQueue);
+    window.addEventListener('storage', renderQueue);
+    renderQueue();
+
     select.addEventListener('change', () => {
       current = 0;
       render();
       schedule.render();
+      renderQueue();
     });
     window.addEventListener('storage', schedule.render);
     render();
